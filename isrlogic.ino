@@ -1,16 +1,16 @@
 /*
 lcd        - 8,9,4,5,6,7
 prototype leds- yellow- 36
-                red   - 37
+        red   - 37
 rtc        - scl-21
-             sda-20
+         sda-20
 rotary encoder - clk-A0
-                 dt -A1
-                 sw -A2
+         dt -A1
+         sw -A2
 sd card module - cs   -53
-                 sck  -52
-                 mosi -51
-                 miso -50
+               sck  -52
+               mosi -51
+               miso -50
 stepper - 24-31
 med detector sensor - 18
 df player -
@@ -22,13 +22,8 @@ df player -
 #include <LiquidCrystal.h>
 #include <ClickEncoder.h>
 #include <TimerOne.h>
-#include <SPI.h>
-#include <SD.h>
 
-#define ChipSelect 53
-#define SCK 52
-#define MOSI 51
-#define MISO 50
+
 #define yled 36
 #define rled 37
 #define sensor 18
@@ -81,19 +76,7 @@ boolean down = false;
 boolean middle = false;
 boolean displaySwitch = false;
 
-int sd_x = 100;
-int sd_y = 101;
-int dataDay = 0; 
-int dataMonth = 0;
-int dataYear = 0; 
-int dataHourFall = 0; 
-int dataMinuteFall = 0;
-int dataHourTaken = 0; 
-int dataMinuteTaken = 0;
-String dataDayOfWeek;
-
 RTC_DS3231 rtc;
-File myFile;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 ClickEncoder *encoder;
 int16_t last, value; 
@@ -102,11 +85,10 @@ byte blank[8] = { 0x00 , 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 void setup () 
 {
-  pinMode(ChipSelect, OUTPUT);
+
   Serial.begin(9600);
   rtc.begin();
   lcd.begin(16,4);
-  if(!SD.begin(ChipSelect)) Serial.println("Failed sd card");
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
 
@@ -149,16 +131,16 @@ void loop ()
        firstBoot();
     } 
     Serial.print(EEPROM.read(2));
-    Serial.print("/");
-    Serial.print(EEPROM.read(3));
-    Serial.print("/");
-    Serial.println(daysOfTheWeek[EEPROM.read(0)]);
+  Serial.print("/");
+  Serial.print(EEPROM.read(3));
+  Serial.print("/");
+  Serial.println(daysOfTheWeek[EEPROM.read(0)]);
 
     Serial.print(EEPROM.read(11));
-    Serial.print("/");
-    Serial.print(EEPROM.read(12));
-    Serial.print("/");
-    Serial.println(daysOfTheWeek[EEPROM.read(13)]);
+  Serial.print("/");
+  Serial.print(EEPROM.read(12));
+  Serial.print("/");
+  Serial.println(daysOfTheWeek[EEPROM.read(13)]);
  /*   int x = 2, y = 3, z = 4;
    for(int i = 0; i < 11; i++)
     {
@@ -172,40 +154,37 @@ void loop ()
     z += 3;
   }
 */
-    encoderButton();
-    if(middle)
-    {
-      middle = !middle;
-      displaySwitch = !displaySwitch;
-    }
+  encoderButton();
+  if(middle)
+  {
+    middle = !middle;
+    displaySwitch = !displaySwitch;
+  }
 
-    if(displaySwitch)
-    {
-      displayTime();
-    }
-
-    if(!displaySwitch)
-    {
-      displayHistory();
-    } 
+  if(displaySwitch)
+  {
+    displayTime();
+  }
+  if(!displaySwitch)
+  {
+    displayHistory();
+  } 
       
     alarmCheck(); 
-    if(isrflag)   // gets executed only after delivery of medicine to rack
+  
+    if(isrflag)
     {
       isrflag = false;
       delay(500);
       if(!digitalRead(sensor))
       { 
         digitalWrite(yled,HIGH);
-        medFall();
         Serial.println("med drop");
         delay(500);
       }
       else if(digitalRead(sensor))
       { 
         digitalWrite(rled,HIGH);
-        medTaken();
-        dataLoggingTaken();
         Serial.println("med taken");
         delay(500);
       }
@@ -215,63 +194,6 @@ void loop ()
   /////////////////////////////////////////////
  //            Functions begin              //
 /////////////////////////////////////////////
-
-void dataLoggingTaken()
-{ 
-  String dataString = String(dataDay) + "." + String(dataMonth) + "." + String(dataYear) + ", " + String(dataDayOfWeek) + ", " + String(dataHourFall) + ":" + String(dataMinuteFall) + ", " + String(dataHourTaken) + ":" + String(dataMinuteTaken);
-  Serial.println("taken logged");
-
-  myFile = SD.open("NewData.csv", FILE_WRITE);
-    if (myFile) 
-    {
-      myFile.println(dataString);
-      myFile.close();
-      Serial.println("logger on");
-    }
-    EEPROM.write(sd_x, dataHourTaken);
-    sd_x = sd_x + 2;
-    EEPROM.write(sd_y, dataMinuteTaken);
-    sd_y = sd_y + 2;
-    if(sd_x > 106) sd_x = 100;
-    if(sd_y > 107) sd_y = 101;
-}
-
-void dataLoggingMissed()
-{ 
-  String dataString = String(dataDay) + "." + String(dataMonth) + "." + String(dataYear) + ", " + String(dataDayOfWeek) + ", " + String(dataHourFall) + ":" + String(dataMinuteFall) + ", " + "Missed";
-  Serial.println("missed logged");
-
-  myFile = SD.open("DATA_FILE.csv", FILE_WRITE);
-    if (myFile) 
-    {
-      myFile.println(dataString);
-      myFile.close();
-    }
-    EEPROM.write(sd_x, 0);
-    sd_x = sd_x + 2;
-    EEPROM.write(sd_y, 0);
-    sd_y = sd_y + 2;
-    if(sd_x > 106) sd_x = 100;
-    if(sd_y > 107) sd_y = 101;
-}
-
-void medFall()
-{ 
-  DateTime now = rtc.now();
-  dataDay = now.day();
-  dataMonth = now.month();
-  dataYear = now.year();
-  dataDayOfWeek = daysOfTheWeek[now.dayOfTheWeek()];
-  dataHourFall = now.hour();
-  dataMinuteFall = now.minute();
-}
-
-void medTaken()
-{
-  DateTime now = rtc.now();
-  dataHourTaken = now.hour(); 
-  dataMinuteTaken = now.minute();
-}
 
 void alarmCheck()
 {
@@ -308,51 +230,13 @@ void alarmCheck()
   currHour = now.hour();
   currMin  = now.minute(); 
   currDay  = now.dayOfTheWeek();
-  //Serial.println(currDay);
+    Serial.println(currDay);
     
   if(currHour == checkHour)
   {
-    if(currMin == checkMin)
+    if(currMin == checkMin || currMin == (checkMin + 5) || currMin == (checkMin + 10) || currMin == (checkMin + 15))
     {
-      Serial.println("should enter once only normal");
       checkTemp2 = true;
-      delay(60000);
-      /*
-        logic for stepper motor
-        and pid control
-        -------make sure it takes more than 60 seconds to execute
-      */
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-      digitalWrite(rled,HIGH);
-      delay(100);
-      digitalWrite(rled,LOW);
-      delay(100);
-    }
-    if((currMin == (checkMin + 5) || currMin == (checkMin + 10) || currMin == (checkMin + 15)) && (!digitalRead(sensor)))
-    {
       Serial.println("Normal doze");
       digitalWrite(rled,HIGH);
       delay(100);
@@ -383,59 +267,15 @@ void alarmCheck()
       digitalWrite(rled,LOW);
       delay(100);
     }
-    if(currMin == (checkMin + 30) && (!digitalRead(sensor)))
-    {
-      dataLoggingMissed();
-      //logic to clear the rack
-    }
   }
 
   if(currDay == checkDay)
   {
     if(currHour == CcheckHour)
     {
-      if(currMin == CcheckMin)
+      if(currMin == CcheckMin || currMin == (CcheckMin + 5) || currMin == (CcheckMin + 10) || currMin == (CcheckMin + 15))
       {
-        Serial.println("should enter once only custom");
         CcheckTemp2 = true;
-        delay(60000);
-        /*
-          logic for stepper motor
-          and pid control 
-          -------make sure it takes more than 60 seconds to execute
-        */
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-        digitalWrite(rled,HIGH);
-        delay(100);
-        digitalWrite(rled,LOW);
-        delay(100);
-      }
-
-      if(currMin == (CcheckMin + 5) || currMin == (CcheckMin + 10) || currMin == (CcheckMin + 15) && (!digitalRead(sensor)))
-      {
         Serial.println("Custom doze");
         digitalWrite(rled,HIGH);
         delay(100);
@@ -466,12 +306,6 @@ void alarmCheck()
         digitalWrite(rled,LOW);
         delay(100);
       }
-
-      if(currMin == (CcheckMin + 30) && (!digitalRead(sensor)))
-      {
-        dataLoggingMissed();
-        //logic to clear the rack
-      }
     }
   }
 
@@ -487,20 +321,20 @@ void displayHistory()
   lcd.clear();
   lcd.setCursor(0,0);
   lcd.print(item1);
-  lcd.print(EEPROM.read(2));
-  lcd.print(EEPROM.read(3));
+  lcd.print(EEPROM.read(100));
+  lcd.print(EEPROM.read(101));
   lcd.setCursor(0,1);
   lcd.print(item2);
-  lcd.print(EEPROM.read(4));
-  lcd.print(EEPROM.read(5));
+  lcd.print(EEPROM.read(102));
+  lcd.print(EEPROM.read(103));
   lcd.setCursor(0,2);
   lcd.print(item3);
-  lcd.print(EEPROM.read(6));
-  lcd.print(EEPROM.read(7));
+  lcd.print(EEPROM.read(104));
+  lcd.print(EEPROM.read(105));
   lcd.setCursor(0,3);
   lcd.print(item4);
-  lcd.print(EEPROM.read(ChourAddr));
-  lcd.print(EEPROM.read(CminAddr));
+  lcd.print(EEPROM.read(106));
+  lcd.print(EEPROM.read(107));
   delay(300);
 }
 
@@ -651,9 +485,9 @@ void displayTime()
    lcd.print(now.year());
    lcd.setCursor(0,3);
    lcd.print("Upcoming:");
-   lcd.print(EEPROM.read(hourAddr));
+   lcd.print(EEPROM.read(100));
    lcd.print('.');
-   lcd.print(EEPROM.read(minAddr));
+   lcd.print(EEPROM.read(101));
    delay(300);
 }
 
