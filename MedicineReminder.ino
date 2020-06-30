@@ -1,7 +1,7 @@
 /*
-*
-* Project Name:   <Medicine Reminder>
-* Author List:    <Mihir Khara, Devashri Naik>
+* Development Board: Arduino MEGA2560 
+* Project Name:   <Medicine Reminder and Vending Machine>
+* Author List:    <Mihir Khara>
 * Filename:     <MedicineReminder.ino>
 * Functions:    All functions expect and return void
 *                <alarmCheck, regAlarmCheck, dataLoggingMissed, dataLoggingTaken, medFall,
@@ -23,7 +23,7 @@
 *                      item1, item2, item3, item4, dataDayOfWeek >
 *                           
 */
-
+/* Library credits to all respected developers */
 #include <Wire.h>
 #include "RTClib.h"
 #include <EEPROM.h>
